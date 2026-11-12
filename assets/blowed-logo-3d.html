@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BloWeD Consulting logo</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.184.0/build/three.module.js"
+  },
+  "integrity": {
+    "https://unpkg.com/three@0.184.0/build/three.module.js": "sha384-8FCZ1eVO6it4+pbec2aDtnTrwjWXZLJRC+MAGCIPDgsYnUrl/E0A2YlF8ioMKI/J",
+    "https://unpkg.com/three@0.184.0/build/three.core.js": "sha384-dw2ooPewaEIrAgl6oFDBmmBWCE9oW9LxRGcfwZ0hLvEprzo202wXl7vCYHRlSnOT"
+  }
+}
+</script>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; color-scheme: normal; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setClearColor(0x000000, 0);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
+
+// Same studio lighting as the original 3D logo
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd8d2c4, 1.0));
+const key = new THREE.DirectionalLight(0xffffff, 2.2);
+key.position.set(4, 7, 5);
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xfff4e6, 0.5);
+fill.position.set(-5, 3, -4);
+scene.add(fill);
+
+const M = {
+  navy:  new THREE.MeshStandardMaterial({ color: 0x1d2b4f, roughness: 0.45, metalness: 0.15 }),
+  blue:  new THREE.MeshStandardMaterial({ color: 0x2f4cf5, roughness: 0.35, metalness: 0.2 }),
+  panel: new THREE.MeshStandardMaterial({ color: 0xf2f3f5, roughness: 0.6,  metalness: 0.05 }),
+  black: new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.5,  metalness: 0.1 }),
+  white: new THREE.MeshStandardMaterial({ color: 0xf7f8f9, roughness: 0.4,  metalness: 0.15 }),
+  light: new THREE.MeshStandardMaterial({ color: 0xc9cbcd, roughness: 0.4,  metalness: 0.25 }),
+  mid:   new THREE.MeshStandardMaterial({ color: 0x8b8d8f, roughness: 0.4,  metalness: 0.3 }),
+};
+
+const model = new THREE.Group();
+
+function plate(w, h, d, z, mat, r = 0.012) {
+  const s = new THREE.Shape();
+  const x = w / 2 - r, y = h / 2 - r;
+  s.moveTo(-x - r, -y);
+  s.lineTo(-x - r, y);
+  s.quadraticCurveTo(-x - r, y + r, -x, y + r);
+  s.lineTo(x, y + r);
+  s.quadraticCurveTo(x + r, y + r, x + r, y);
+  s.lineTo(x + r, -y);
+  s.quadraticCurveTo(x + r, -y - r, x, -y - r);
+  s.lineTo(-x, -y - r);
+  s.quadraticCurveTo(-x - r, -y - r, -x - r, -y);
+  const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 8 });
+  const m = new THREE.Mesh(g, mat);
+  m.position.z = z;
+  return m;
+}
+
+const PW = 1.52, PH = 0.95;
+model.add(plate(PW, PH, 0.055, 0, M.navy));
+model.add(plate(PW - 0.075, PH - 0.075, 0.02, 0.055, M.blue));
+model.add(plate(PW - 0.24, PH - 0.20, 0.014, 0.074, M.navy));
+model.add(plate(PW - 0.30, PH - 0.26, 0.010, 0.087, M.panel));
+
+function arrowPoints(L, shaft, head, headLen, tailTrim = 0) {
+  const tailX = -L / 2 + tailTrim;
+  return [
+    [tailX, -shaft / 2],
+    [L / 2 - headLen, -shaft / 2],
+    [L / 2 - headLen, -head / 2],
+    [L / 2, 0],
+    [L / 2 - headLen, head / 2],
+    [L / 2 - headLen, shaft / 2],
+    [tailX, shaft / 2],
+  ];
+}
+
+function offsetPoints(points, t) {
+  const n = points.length;
+  let area = 0;
+  for (let i = 0; i < n; i++) {
+    const [x1, y1] = points[i], [x2, y2] = points[(i + 1) % n];
+    area += x1 * y2 - x2 * y1;
+  }
+  const sign = area > 0 ? 1 : -1;
+  const normals = [];
+  for (let i = 0; i < n; i++) {
+    const [x1, y1] = points[i], [x2, y2] = points[(i + 1) % n];
+    let dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    dx /= len; dy /= len;
+    normals.push([dy * sign, -dx * sign]);
+  }
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const prev = (i - 1 + n) % n;
+    const p1 = points[prev], p2 = points[i], p4 = points[(i + 1) % n];
+    const nA = normals[prev], nB = normals[i];
+    const Ax = p1[0] + nA[0] * t, Ay = p1[1] + nA[1] * t;
+    const dirA = [p2[0] - p1[0], p2[1] - p1[1]];
+    const Bx = p2[0] + nB[0] * t, By = p2[1] + nB[1] * t;
+    const dirB = [p4[0] - p2[0], p4[1] - p2[1]];
+    const denom = dirA[0] * dirB[1] - dirA[1] * dirB[0];
+    if (Math.abs(denom) < 1e-9) { out.push([Ax, Ay]); continue; }
+    const s = ((Bx - Ax) * dirB[1] - (By - Ay) * dirB[0]) / denom;
+    out.push([Ax + dirA[0] * s, Ay + dirA[1] * s]);
+  }
+  return out;
+}
+
+function shapeFromPoints(pts) {
+  const s = new THREE.Shape();
+  s.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]);
+  s.closePath();
+  return s;
+}
+
+function arrow(mat, scale, depth, tailTrim = 0) {
+  const g = new THREE.Group();
+  const L = 0.80 * scale, shaft = 0.185 * scale, head = 0.40 * scale, headLen = 0.30 * scale;
+  const pts = arrowPoints(L, shaft, head, headLen, tailTrim);
+  const face = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(shapeFromPoints(pts), {
+      depth, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2,
+    }), mat);
+  const rim = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(shapeFromPoints(offsetPoints(pts, 0.045)), {
+      depth: depth * 0.75, bevelEnabled: false,
+    }), M.black);
+  rim.position.z = -0.004;
+  g.add(rim, face);
+  return g;
+}
+
+const steps = [
+  { mat: M.white, scale: 1.00, x: -0.30, y: -0.235, z: 0.238, tailTrim: 0.045 },
+  { mat: M.light, scale: 1.11, x:  0.11, y:  0.010, z: 0.168 },
+  { mat: M.mid,   scale: 1.22, x:  0.55, y:  0.255, z: 0.098 },
+];
+for (const s of steps) {
+  const a = arrow(s.mat, s.scale, 0.062, s.tailTrim || 0);
+  a.position.set(s.x, s.y, s.z);
+  model.add(a);
+}
+
+// Centre the model on the spin axis
+const box = new THREE.Box3().setFromObject(model);
+const c = box.getCenter(new THREE.Vector3());
+model.position.sub(c);
+
+const root = new THREE.Group();
+root.add(model);
+scene.add(root);
+
+// Largest horizontal reach while spinning around Y, and half the height
+const b = new THREE.Box3().setFromObject(model);
+let rXZ = 0;
+for (const x of [b.min.x, b.max.x]) for (const z of [b.min.z, b.max.z]) rXZ = Math.max(rXZ, Math.hypot(x, z));
+const halfH = (b.max.y - b.min.y) / 2;
+
+// Frame so the whole logo fills the box and never clips during the spin
+function fit() {
+  const w = window.innerWidth || 1, h = window.innerHeight || 1;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const tanH = tanV * camera.aspect;
+  const pad = 1.02;
+  const dist = rXZ + Math.max((halfH * pad) / tanV, (rXZ * pad) / tanH);
+  camera.position.set(0, 0, dist);
+  camera.lookAt(0, 0, 0);
+  camera.updateProjectionMatrix();
+}
+fit();
+window.addEventListener('resize', fit);
+
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// One full turn every 3 seconds, timed by the clock so it's the same on 60 Hz and 120 Hz screens
+const SECONDS_PER_TURN = 3;
+const SPIN_SPEED = (Math.PI * 2) / SECONDS_PER_TURN; // radians per second
+let last = performance.now();
+renderer.setAnimationLoop((now) => {
+  const dt = Math.min((now - last) / 1000, 0.1); // cap the jump after a paused or hidden tab
+  last = now;
+  if (!reduceMotion) root.rotation.y = (root.rotation.y + SPIN_SPEED * dt) % (Math.PI * 2);
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
